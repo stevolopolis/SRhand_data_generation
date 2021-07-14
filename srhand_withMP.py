@@ -55,6 +55,16 @@ def write_annotation(img,pts,hand_rect):
 
     assert (len(pts) == len(hand_rect)) #make sure they have the same len before writing the annotation
     
+    min_x = hand_rect[0][0]
+    min_y = hand_rect[0][1]
+    max_x = hand_rect[0][2]
+    max_y = hand_rect[0][3]
+    #cen_x = hand_rect[0][4]
+    #cen_y = hand_rect[0][5]
+
+    w = max_x - min_x
+    h = max_y - min_y
+
     for pt in pts:
         #input(pt) #convert tuple to list first
 
@@ -62,7 +72,7 @@ def write_annotation(img,pts,hand_rect):
         
         tmp_ary = np.array(tmp)
         pt = np.array(pt)
-        
+        '''
         min_x = min(tmp_ary[:,0]) #@ERROR, Empty list()
         min_y = min(tmp_ary[:,1])
 
@@ -71,7 +81,7 @@ def write_annotation(img,pts,hand_rect):
         
         w = max_x - min_x #original ratio
         h = max_y - min_y
-
+        '''
         #center points
         (cen_x,cen_y) = (int(min_x+(w/2)),int(min_y+(h/2)))
         
@@ -82,7 +92,7 @@ def write_annotation(img,pts,hand_rect):
             box_size = w
 
         
-        box_size = math.ceil(box_size*1.4) #pad with ratio
+        box_size = math.ceil(box_size*1.2) #pad with ratio
 
         (new_min_x,new_min_y) = (int(cen_x - box_size/2),int(cen_y - box_size/2))
         (new_max_x,new_max_y) = (int(cen_x + box_size/2),int(cen_y + box_size/2))
