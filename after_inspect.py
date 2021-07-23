@@ -2,10 +2,10 @@ import os
 
 import random
 
-save_path = "./inspected_anno"
+save_path = "./other_data/inspected_anno"
 
-inspected_img_list = os.listdir("./inspected")
-data_path = "./annotations"
+inspected_img_list = os.listdir("./other_data/vis")
+data_path = "./other_data/annotations"
 random.shuffle(inspected_img_list)
 
 #80% training data

@@ -1,28 +1,34 @@
 #!/usr/bin/python3
 import cv2
 import numpy as np
-from math import sqrt
+import tensorflow as tf
 import torch
 import sys
 import os
 from operator import itemgetter
 from skimage import feature
 from datetime import datetime
+from tensorflow.keras.models import load_model
+from math import sqrt
 import math
 import copy
 import mediapipe as mp
 import cv2 as cv 
 import os
 
-os.environ["CUDA_VISIBLE_DEVICES"]="0"
+os.environ["CUDA_VISIBLE_DEVICES"]="-1"
 
 VISUALIZE = True
 keypoints = [0, 1, 5, 9, 13, 17]
 
-device = torch.device('cuda')
+device = torch.device('cpu')
 
 mp_drawing = mp.solutions.drawing_utils
 mp_hands = mp.solutions.hands
+
+kp_model_path = 'trial_2.h5'
+kp_model = load_model(kp_model_path)
+kp_model.summary()
 
 #target = sys.argv[1] if len(sys.argv) > 1 else None
 target = 0
@@ -55,6 +61,16 @@ def write_annotation(img,pts,hand_rect):
 
     assert (len(pts) == len(hand_rect)) #make sure they have the same len before writing the annotation
     
+    min_x = hand_rect[0][0]
+    min_y = hand_rect[0][1]
+    max_x = hand_rect[0][2]
+    max_y = hand_rect[0][3]
+    #cen_x = hand_rect[0][4]
+    #cen_y = hand_rect[0][5]
+
+    w = max_x - min_x
+    h = max_y - min_y
+
     for pt in pts:
         #input(pt) #convert tuple to list first
 
@@ -62,7 +78,7 @@ def write_annotation(img,pts,hand_rect):
         
         tmp_ary = np.array(tmp)
         pt = np.array(pt)
-        
+        '''
         min_x = min(tmp_ary[:,0]) #@ERROR, Empty list()
         min_y = min(tmp_ary[:,1])
 
@@ -71,7 +87,7 @@ def write_annotation(img,pts,hand_rect):
         
         w = max_x - min_x #original ratio
         h = max_y - min_y
-
+        '''
         #center points
         (cen_x,cen_y) = (int(min_x+(w/2)),int(min_y+(h/2)))
         
@@ -82,7 +98,7 @@ def write_annotation(img,pts,hand_rect):
             box_size = w
 
         
-        box_size = math.ceil(box_size*1.4) #pad with ratio
+        box_size = math.ceil(box_size*1.1) #pad with ratio
 
         (new_min_x,new_min_y) = (int(cen_x - box_size/2),int(cen_y - box_size/2))
         (new_max_x,new_max_y) = (int(cen_x + box_size/2),int(cen_y + box_size/2))
@@ -173,6 +189,17 @@ def write_annotation(img,pts,hand_rect):
                     continue
                 else:
                     hand_img_vis = cv2.circle(hand_img_vis, (int(relative_pts_coord[p][0]*scale),int(relative_pts_coord[p][1]*scale)), radius=4, color=(0, 0, 255), thickness=-1)
+
+        for i in range(5):
+            for j in range(3):
+                cnt = j+i*4+1
+                if len(relative_pts_coord[cnt]) != 0 and len(relative_pts_coord[cnt+1])!=0 :
+                    frame = cv2.line(hand_img_vis,
+                                     (int(relative_pts_coord[cnt][0]*scale),int(relative_pts_coord[cnt][1]*scale)),
+                                     (int(relative_pts_coord[cnt+1][0]*scale),int(relative_pts_coord[cnt+1][1]*scale)),
+                                     (0, 255, 0),
+                                     2)
+
 
         current_time = str(datetime.now().timestamp() * 1000)
         txt_file = current_time + ".txt"
@@ -331,6 +358,26 @@ def detect_hand_v2(input_image):
 
     return many_points
 
+def detect_hand_v3(input_image):
+    input_image = cv.resize(input_image, (224, 224), interpolation=cv.INTER_CUBIC)
+    input_image = (input_image / 255 - 0.5) * 2
+
+    input_image = tf.convert_to_tensor(input_image)
+    input_image = tf.expand_dims(input_image, axis=0)
+
+    prediction = kp_model.predict(input_image)[0]
+
+    many_points = []
+    kp_list = []
+    for keypoint in range(21):
+        x = int(prediction[keypoint*2] * 224)
+        y = int(prediction[keypoint*2+1] * 224)
+        kp_list.append((x, y))
+
+    many_points.append(kp_list)
+
+    return many_points
+
 def pyramid_inference(input_image):
 
     rows, cols, _ = input_image.shape
@@ -354,6 +401,9 @@ def pyramid_inference(input_image):
 def feed_frame(frame):
     save_img = frame.copy()
     many_keypoints, hand_rect = pyramid_inference(frame)
+
+    if hand_rect == []:
+        return cv2.resize(frame, (512, 512))
 
     #extract kpts and hand rectangle
     have_hand = write_annotation(save_img,many_keypoints,hand_rect)
